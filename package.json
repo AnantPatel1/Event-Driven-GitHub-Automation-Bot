@@ -1,0 +1,31 @@
+{
+  "name": "github-automation-bot",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,WEB\" -c \"magenta,cyan\" \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "npm run dev --workspace=@github-bot/server",
+    "dev:web": "npm run dev --workspace=@github-bot/web",
+    "build:shared": "npm run build --workspace=@github-bot/shared",
+    "build": "npm run build:shared && npm run build --workspace=@github-bot/server && npm run build --workspace=@github-bot/web",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "test": "tsx scripts/test_auth.ts && tsx scripts/test_repositories.ts && tsx scripts/test_engine.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "concurrently": "^9.1.2",
+    "dotenv": "^16.4.7",
+    "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

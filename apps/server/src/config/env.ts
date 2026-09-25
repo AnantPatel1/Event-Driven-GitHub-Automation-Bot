@@ -1,0 +1,29 @@
+import { z } from 'zod';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables from root or local .env
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+dotenv.config();
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().default(4000),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+  NEXT_PUBLIC_API_URL: z.string().default('http://localhost:4000'),
+  GITHUB_CLIENT_ID: z.string().default(''),
+  GITHUB_CLIENT_SECRET: z.string().default(''),
+  GITHUB_WEBHOOK_SECRET: z.string().default(''),
+  SLACK_WEBHOOK_URL: z.string().default(''),
+  SESSION_SECRET: z.string().default('default_session_secret_at_least_32_chars_long_12345'),
+});
+
+const parsedEnv = envSchema.safeParse(process.env);
+
+if (!parsedEnv.success) {
+  console.error('❌ Invalid environment variables:', parsedEnv.error.format());
+  process.exit(1);
+}
+
+export const env = parsedEnv.data;

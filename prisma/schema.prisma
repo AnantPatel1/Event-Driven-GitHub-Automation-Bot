@@ -1,0 +1,93 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String       @id @default(uuid())
+  githubId          String       @unique
+  githubUsername    String
+  githubAccessToken String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  repositories      Repository[]
+
+  @@map("users")
+}
+
+model Repository {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubRepositoryId String
+  owner              String
+  name               String
+  fullName           String
+  webhookId          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  rules              Rule[]
+  events             GitHubEvent[]
+
+  @@unique([userId, githubRepositoryId])
+  @@index([userId])
+  @@index([fullName])
+  @@map("repositories")
+}
+
+model Rule {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  eventType    String
+  conditions   Json
+  actions      Json
+  enabled      Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([repositoryId])
+  @@index([eventType])
+  @@map("rules")
+}
+
+model GitHubEvent {
+  id           String      @id @default(uuid())
+  repositoryId String?
+  repository   Repository? @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  deliveryId   String      @unique
+  eventType    String
+  action       String?
+  payload      Json
+  status       String      @default("PENDING")
+  receivedAt   DateTime    @default(now())
+  processedAt  DateTime?
+  createdAt    DateTime    @default(now())
+  actions      BotAction[]
+
+  @@index([repositoryId])
+  @@index([status])
+  @@index([eventType])
+  @@map("github_events")
+}
+
+model BotAction {
+  id        String      @id @default(uuid())
+  eventId   String
+  event     GitHubEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  type      String
+  status    String      @default("PENDING")
+  details   Json?
+  error     String?
+  attempts  Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([eventId])
+  @@index([status])
+  @@map("bot_actions")
+}
