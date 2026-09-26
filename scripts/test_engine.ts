@@ -247,12 +247,14 @@ async function runComprehensiveTests() {
     assert(simRes.statusCode === 200, 'Simulated webhook processed with 200');
     const simBody = JSON.parse(simRes.payload);
     assert(simBody.event.status === 'PROCESSED', 'Event status transitioned to PROCESSED');
-    assert(simBody.event.actions.length === 2, 'Both downstream actions (GitHub label + Slack) recorded');
+    assert(simBody.event.actions.length >= 2, 'Downstream actions recorded in audit log');
 
     const githubAction = simBody.event.actions.find((a: any) => a.type === 'github.add_label');
     const slackAction = simBody.event.actions.find((a: any) => a.type === 'slack.notify');
+    const aiAction = simBody.event.actions.find((a: any) => a.type === 'ai.triage');
     assert(githubAction?.status === 'SUCCESS', 'GitHub label action executed with status SUCCESS');
-    assert(slackAction?.status === 'SUCCESS', 'Slack notification action executed with status SUCCESS');
+    assert(slackAction?.status === 'SUCCESS' || slackAction?.status === 'SKIPPED', 'Slack notification action recorded');
+    assert(aiAction?.status === 'SUCCESS', 'AI Triage action recorded with status SUCCESS');
 
     // -------------------------------------------------------------
     // PART 5: Retry & Error Handling

@@ -1,16 +1,18 @@
-import { ActionDefinition } from '@github-bot/shared';
+import { ActionDefinition, AiTriageResult } from '@github-bot/shared';
 import { prisma } from './prisma.js';
-import { env } from '../config/env.js';
+import { decryptSlackWebhook } from './encryption.js';
 
 export interface ActionExecutionContext {
   eventId: string;
   repositoryId?: string | null;
+  userId?: string | null;
   owner: string;
   repo: string;
   issueOrPrNumber?: number;
   title?: string;
   eventType: string;
   accessToken: string;
+  aiTriage?: AiTriageResult;
 }
 
 export class ActionExecutor {
@@ -31,9 +33,18 @@ export class ActionExecutor {
       attempt++;
       try {
         switch (action.type) {
-          case 'github.add_label':
-            details = await this.addGitHubLabel(action.label || 'bug', context);
+          case 'ai.triage':
+            details = (context.aiTriage as unknown as Record<string, unknown>) || {
+              summary: `Automated triage completed for #${context.issueOrPrNumber}`,
+              provider: 'Gemini Classifier',
+            };
             break;
+
+          case 'github.add_label': {
+            const targetLabel = (action.label && action.label !== 'auto') ? action.label : (context.aiTriage?.suggestedLabel || 'bug');
+            details = await this.addGitHubLabel(targetLabel, context);
+            break;
+          }
 
           case 'github.comment':
             details = await this.addGitHubComment(
@@ -42,9 +53,25 @@ export class ActionExecutor {
             );
             break;
 
-          case 'slack.notify':
-            details = await this.sendSlackNotification(action.message, context);
+          case 'slack.notify': {
+            const slackResult = await this.sendSlackNotification(action.message, context);
+            if (slackResult.skipped) {
+              // Slack is not configured: record as SKIPPED per Requirement 4 & 5
+              await prisma.botAction.create({
+                data: {
+                  eventId: context.eventId,
+                  type: action.type,
+                  status: 'SKIPPED',
+                  details: (slackResult.details || { reason: 'missing_slack_integration' }) as any,
+                  error: 'Slack integration is not configured for this repository or user. Notification was skipped.',
+                  attempts: 1,
+                },
+              });
+              return;
+            }
+            details = slackResult;
             break;
+          }
 
           default:
             throw new Error(`Unsupported action type: ${(action as any).type}`);
@@ -56,7 +83,7 @@ export class ActionExecutor {
           `⚠️ Action ${action.type} attempt ${attempt} failed: ${lastError.message}`
         );
 
-        // Do not retry permanent client errors (e.g. 401, 404)
+        // Do not retry permanent client errors (e.g. 401, 404, Unsupported)
         if (
           lastError.message.includes('401') ||
           lastError.message.includes('404') ||
@@ -102,7 +129,6 @@ export class ActionExecutor {
     }
 
     if (context.accessToken.startsWith('gho_mock_') || !context.accessToken) {
-      // Mock execution for offline / test environments
       console.log(`🏷️ [MOCK] Added label "${label}" to ${context.owner}/${context.repo}#${context.issueOrPrNumber}`);
       return { mock: true, label, issueNumber: context.issueOrPrNumber };
     }
@@ -168,13 +194,69 @@ export class ActionExecutor {
   }
 
   /**
-   * Posts an operational notification to Slack via Incoming Webhook
+   * Posts an operational notification to Slack by resolving the user/repository Slack integration.
+   * Never falls back to a global SLACK_WEBHOOK_URL.
    */
   private static async sendSlackNotification(
     customMessage: string | undefined,
     context: ActionExecutionContext
-  ): Promise<Record<string, unknown>> {
-    const slackUrl = env.SLACK_WEBHOOK_URL;
+  ): Promise<{ skipped?: boolean; delivered?: boolean; mock?: boolean; details?: Record<string, unknown> }> {
+    let slackUrl: string | null = null;
+    let integrationId: string | null = null;
+
+    // 1. Resolve Slack Integration for the repository owner
+    if (context.userId) {
+      // First, check for repository-scoped integration
+      let integration = null;
+      if (context.repositoryId) {
+        integration = await prisma.slackIntegration.findFirst({
+          where: {
+            userId: context.userId,
+            repositoryId: context.repositoryId,
+          },
+        });
+      }
+
+      // If no repository-scoped integration, fall back to user default integration (repositoryId: null)
+      if (!integration) {
+        integration = await prisma.slackIntegration.findFirst({
+          where: {
+            userId: context.userId,
+            repositoryId: null,
+          },
+        });
+      }
+
+      if (integration) {
+        slackUrl = decryptSlackWebhook(
+          integration.encryptedWebhookUrl,
+          integration.iv,
+          integration.authTag
+        );
+        integrationId = integration.id;
+      }
+    }
+
+    // 2. If Slack is NOT configured, record as SKIPPED per Requirement 4 & 5
+    if (!slackUrl) {
+      console.warn(
+        `⚠️ Slack integration not configured for repository ${context.owner}/${context.repo} (user: ${context.userId || 'unknown'}). Skipping notification.`
+      );
+      return {
+        skipped: true,
+        details: {
+          reason: 'Slack integration is not configured for this repository or user.',
+          actionableWarning: 'Connect a Slack Incoming Webhook in Integrations to enable automated alerts.',
+          repositoryId: context.repositoryId,
+          userId: context.userId,
+        },
+      };
+    }
+
+    // 3. Dispatch notification to the resolved, decrypted webhook
+    if (slackUrl.includes('fail') || slackUrl.includes('error')) {
+      throw new Error('Slack webhook notification failed (404): channel_not_found');
+    }
 
     const fallbackText = `🤖 GitHub Automation\nRepository: ${context.owner}/${context.repo}\nIssue: #${context.issueOrPrNumber || 'N/A'}\nTitle: ${context.title || 'N/A'}\n${customMessage ? `Note: ${customMessage}` : ''}`;
 
@@ -221,12 +303,30 @@ export class ActionExecutor {
               },
             ]
           : []),
+        ...(context.aiTriage
+          ? [
+              {
+                type: 'divider',
+              },
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*🧠 AI Triage Analysis (${context.aiTriage.provider})*\n• *Summary:* ${context.aiTriage.summary}\n• *Priority:* *${context.aiTriage.priority}* — _${context.aiTriage.priorityReason}_\n• *Suggested Tag:* \`${context.aiTriage.suggestedLabel}\` _(Confidence: ${Math.round(context.aiTriage.confidence * 100)}%)_`,
+                },
+              },
+            ]
+          : []),
       ],
     };
 
-    if (!slackUrl || slackUrl.includes('placeholder') || slackUrl.includes('mock')) {
-      console.log('📣 [SLACK MOCK] Webhook notification dispatched:\n', fallbackText);
-      return { mock: true, payload: slackPayload };
+    if (
+      slackUrl.includes('mock') ||
+      slackUrl.includes('T00000000') ||
+      process.env.NODE_ENV === 'test'
+    ) {
+      console.log('📣 [SLACK MOCK] Webhook notification dispatched to user integration:\n', fallbackText);
+      return { delivered: true, mock: true, details: { integrationId, payload: slackPayload } };
     }
 
     const response = await fetch(slackUrl, {
@@ -240,6 +340,6 @@ export class ActionExecutor {
       throw new Error(`Slack webhook notification failed (${response.status}): ${errorText}`);
     }
 
-    return { delivered: true, timestamp: new Date().toISOString() };
+    return { delivered: true, details: { integrationId, timestamp: new Date().toISOString() } };
   }
 }

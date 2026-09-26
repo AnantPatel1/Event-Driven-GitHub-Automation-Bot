@@ -10,7 +10,16 @@ export interface RuleCondition {
   value: string;
 }
 
-export type ActionType = 'github.add_label' | 'github.comment' | 'slack.notify';
+export type ActionType = 'github.add_label' | 'github.comment' | 'slack.notify' | 'ai.triage';
+
+export interface AiTriageResult {
+  summary: string;
+  suggestedLabel: string;
+  priority: 'P0' | 'P1' | 'P2' | 'P3';
+  priorityReason: string;
+  confidence: number;
+  provider: string;
+}
 
 export interface ActionDefinition {
   type: ActionType;
@@ -32,7 +41,7 @@ export interface RuleConfig {
 
 export type EventProcessingStatus = 'PENDING' | 'PROCESSED' | 'FAILED' | 'IGNORED';
 
-export type ActionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+export type ActionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
 
 export interface HealthResponse {
   status: 'ok' | 'error';
@@ -138,12 +147,54 @@ export interface GitHubEventItem {
   actions: BotActionItem[];
 }
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  totalActions?: number;
+}
+
+export interface PaginatedEventsResponse {
+  events: GitHubEventItem[];
+  pagination: PaginationMeta;
+}
+
 export interface CreateRuleDto {
   repositoryId: string;
   eventType: SupportedEventType;
   conditions: RuleCondition[];
   actions: ActionDefinition[];
   enabled?: boolean;
+}
+
+export interface SlackIntegrationItem {
+  id: string;
+  userId: string;
+  repositoryId?: string | null;
+  repositoryName?: string | null;
+  channelName?: string | null;
+  webhookUrlMask: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface SaveSlackIntegrationDto {
+  webhookUrl: string;
+  repositoryId?: string | null;
+  channelName?: string | null;
+}
+
+export interface TestSlackIntegrationDto {
+  webhookUrl?: string;
+  integrationId?: string;
+  channelName?: string | null;
+}
+
+export interface TestSlackResult {
+  success: boolean;
+  statusCode?: number;
+  message: string;
 }
 
 

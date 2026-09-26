@@ -12,9 +12,10 @@ model User {
   githubId          String       @unique
   githubUsername    String
   githubAccessToken String
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   repositories      Repository[]
+  slackIntegrations SlackIntegration[]
 
   @@map("users")
 }
@@ -28,10 +29,11 @@ model Repository {
   name               String
   fullName           String
   webhookId          String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   rules              Rule[]
   events             GitHubEvent[]
+  slackIntegrations  SlackIntegration[]
 
   @@unique([userId, githubRepositoryId])
   @@index([userId])
@@ -90,4 +92,23 @@ model BotAction {
   @@index([eventId])
   @@index([status])
   @@map("bot_actions")
+}
+
+model SlackIntegration {
+  id                  String      @id @default(uuid())
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositoryId        String?
+  repository          Repository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  channelName         String?
+  webhookUrlMask      String
+  encryptedWebhookUrl String
+  iv                  String
+  authTag             String
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([repositoryId])
+  @@map("slack_integrations")
 }

@@ -120,7 +120,33 @@ export const webhookRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             ...(fullName ? [{ fullName }] : []),
           ],
         },
+        include: {
+          rules: {
+            where: { enabled: true },
+          },
+        },
       });
+    }
+
+    const action = (payload.action as string) || '';
+
+    // Filter out internal secondary lifecycle events (like 'labeled', 'unlabeled')
+    // triggered by downstream bot actions to prevent duplicate delivery records and action loops
+    if (eventType === 'issues' && (action === 'labeled' || action === 'unlabeled')) {
+      const hasSpecificRule = localRepo?.rules?.some((r: any) =>
+        Array.isArray(r.conditions) &&
+        r.conditions.some((c: any) => (c.field === 'action' || c.field === 'payload.action') && c.value === action)
+      );
+
+      if (!hasSpecificRule) {
+        fastify.log.info({ deliveryId, action }, 'Ignoring secondary issue label event to prevent duplicate delivery records.');
+        return reply.status(200).send({
+          status: 'ignored',
+          reason: 'secondary_label_event_ignored',
+          deliveryId,
+          message: 'Secondary issue label event ignored to prevent duplicate audit records.',
+        });
+      }
     }
 
     // 6. Persist Raw Webhook Event

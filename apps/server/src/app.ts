@@ -10,12 +10,14 @@ import { repositoryRoutes } from './routes/repositories.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { ruleRoutes } from './routes/rules.js';
 import { eventRoutes } from './routes/events.js';
+import { integrationsRoutes } from './routes/integrations.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: env.NODE_ENV === 'development' ? 'info' : 'warn',
     },
+    trustProxy: true,
   });
 
   // Preserve raw request body buffer for HMAC-SHA256 webhook signature verification
@@ -51,6 +53,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(webhookRoutes);
   await app.register(ruleRoutes);
   await app.register(eventRoutes);
+  await app.register(integrationsRoutes);
 
   // Root welcome / info route
   app.get('/', async () => {

@@ -69,6 +69,24 @@ export function evaluateRule(
   }
 
   const conditions = Array.isArray(rule.conditions) ? (rule.conditions as RuleCondition[]) : [];
+
+  // Check if rule specifies an explicit condition on action (e.g. action equals 'labeled' or 'closed')
+  const hasActionCondition = conditions.some(
+    (c) => c.field === 'action' || c.field === 'payload.action'
+  );
+
+  // If no action condition is specified, default to only triggering on initial creation ('opened')
+  // This prevents secondary events (like when the bot applies a label) from triggering duplicate alerts or feedback loops
+  if (!hasActionCondition) {
+    const action = payload.action ? String(payload.action) : '';
+    if (rule.eventType === 'issues' && action && action !== 'opened') {
+      return false;
+    }
+    if (rule.eventType === 'pull_request' && action && action !== 'opened') {
+      return false;
+    }
+  }
+
   if (conditions.length === 0) {
     return true;
   }

@@ -1,6 +1,6 @@
 # GitHub Automation Bot (Event-Driven Orchestration)
 
-A production-grade, event-driven GitHub automation platform built with Next.js App Router, Fastify (TypeScript), PostgreSQL with Prisma ORM, and Slack Webhooks.
+A production-grade, event-driven GitHub automation platform built with Next.js App Router, Fastify (TypeScript), PostgreSQL with Prisma ORM, Slack Webhooks, and Google Gemini 1.5 Flash AI Triage.
 
 ---
 
@@ -124,6 +124,7 @@ cp .env.example .env
 | `GITHUB_WEBHOOK_SECRET`| Shared secret for HMAC-SHA256 signature verification | E.g., `development_webhook_secret_key_32chars` |
 | `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL | `https://hooks.slack.com/services/...` |
 | `SESSION_SECRET` | Secret key for signing session cookies | Random 32+ character string |
+| `GEMINI_API_KEY` | Google Gemini 1.5 Flash API key for AI triage | Free from [aistudio.google.com](https://aistudio.google.com) |
 
 ### 3. Launch Local PostgreSQL Database
 ```bash

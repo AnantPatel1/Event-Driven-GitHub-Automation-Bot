@@ -35,27 +35,57 @@ export const eventRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
    * GET /events
    * Returns recent webhook events and associated bot actions for the user's repositories
    */
-  fastify.get('/events', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  fastify.get<{
+    Querystring: {
+      page?: string;
+      limit?: string;
+      status?: string;
+    };
+  }>('/events', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const userId = request.user!.id;
+    const { page: pageStr, limit: limitStr, status } = request.query;
 
-    const events = await prisma.gitHubEvent.findMany({
-      where: {
-        OR: [
-          { repository: { userId } },
-          { repositoryId: null }, // System or unmatched events
-        ],
-      },
-      include: {
-        repository: {
-          select: { fullName: true },
+    const page = Math.max(1, parseInt(pageStr || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitStr || '15', 10) || 15));
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      OR: [
+        { repository: { userId } },
+        { repositoryId: null }, // System or unmatched events
+      ],
+      ...(status && status !== 'all' ? { status } : {}),
+    };
+
+    const userEventsWhere = {
+      OR: [
+        { repository: { userId } },
+        { repositoryId: null }, // System or unmatched events
+      ],
+    };
+
+    const [events, totalCount, totalActions] = await Promise.all([
+      prisma.gitHubEvent.findMany({
+        where,
+        include: {
+          repository: {
+            select: { fullName: true },
+          },
+          actions: {
+            orderBy: { createdAt: 'asc' },
+          },
         },
-        actions: {
-          orderBy: { createdAt: 'asc' },
+        orderBy: { receivedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.gitHubEvent.count({ where }),
+      prisma.botAction.count({
+        where: {
+          event: userEventsWhere,
         },
-      },
-      orderBy: { receivedAt: 'desc' },
-      take: 50,
-    });
+      }),
+    ]);
 
     const items: GitHubEventItem[] = (events as DbEventWithRelations[]).map((e: DbEventWithRelations) => ({
       id: e.id,
@@ -81,6 +111,15 @@ export const eventRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       })),
     }));
 
-    return reply.send({ events: items });
+    return reply.send({
+      events: items,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit) || 1,
+        totalActions,
+      },
+    });
   });
 };

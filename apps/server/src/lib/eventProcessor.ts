@@ -2,6 +2,7 @@ import { prisma } from './prisma.js';
 import { evaluateRule } from './ruleEngine.js';
 import { ActionExecutor, ActionExecutionContext } from './actionExecutor.js';
 import { ActionDefinition } from '@github-bot/shared';
+import { GeminiTriageService } from './geminiTriage.js';
 
 export class EventProcessor {
   /**
@@ -46,15 +47,45 @@ export class EventProcessor {
       const repoName = (repo?.name || repoPayload?.name || 'unknown') as string;
       const accessToken = repo?.user?.githubAccessToken || '';
 
+      // Execute AI Triage via Google Gemini 1.5 Flash
+      let aiTriageResult = null;
+      if (title && (event.eventType === 'issues' || event.eventType === 'pull_request')) {
+        try {
+          const body = (issueOrPr?.body as string) || '';
+          const author = ((issueOrPr?.user as any)?.login as string) || '';
+          aiTriageResult = await GeminiTriageService.triage({
+            title,
+            body,
+            eventType: event.eventType,
+            author,
+          });
+
+          // Record AI triage action in PostgreSQL audit trail
+          await prisma.botAction.create({
+            data: {
+              eventId: event.id,
+              type: 'ai.triage',
+              status: 'SUCCESS',
+              details: aiTriageResult as any,
+              attempts: 1,
+            },
+          });
+        } catch (aiErr) {
+          console.warn('AI Triage error:', aiErr);
+        }
+      }
+
       const context: ActionExecutionContext = {
         eventId: event.id,
         repositoryId: repo?.id,
+        userId: repo?.userId || repo?.user?.id || null,
         owner,
         repo: repoName,
         issueOrPrNumber,
         title,
         eventType: event.eventType,
         accessToken,
+        aiTriage: aiTriageResult || undefined,
       };
 
       let anyRuleMatched = false;

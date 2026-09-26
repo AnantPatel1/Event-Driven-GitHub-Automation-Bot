@@ -9,28 +9,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#090d16',
-        surface: '#0f172a',
-        'surface-card': '#161f36',
-        'surface-border': '#1e293b',
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+        background: '#f6f8fa',
+        foreground: '#1f2328',
+        surface: {
+          50: '#f6f8fa',
+          100: '#f3f4f6',
+          200: '#e5e7eb',
+          300: '#d0d7de',
         },
-        accent: {
-          violet: '#8b5cf6',
-          cyan: '#06b6d4',
-          emerald: '#10b981',
-          amber: '#f59e0b',
-          rose: '#f43f5e',
+        border: {
+          subtle: '#e1e4e8',
+          DEFAULT: '#d0d7de',
+          hover: '#afb8c1',
+        },
+        brand: {
+          50: '#ddf4ff',
+          100: '#b6e3ff',
+          400: '#54aeff',
+          500: '#0969da',
+          600: '#1a7f37',
+          700: '#0550ae',
         },
       },
     },

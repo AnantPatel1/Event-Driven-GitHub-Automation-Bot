@@ -4,7 +4,7 @@
 This repository implements an event-driven GitHub Automation Bot that connects to GitHub repositories, verifies and ingests webhooks idempotently, evaluates configurable rules, and executes downstream actions (GitHub API labels/comments + Slack notifications).
 
 ## Monorepo Layout
-- `apps/web`: Next.js 15 App Router frontend (Port 3000)
+- `apps/web`: Next.js 16 App Router frontend (Port 3000)
 - `apps/server`: Fastify Node.js TypeScript API & webhook processor (Port 4000)
 - `packages/shared`: Shared TypeScript types, schemas, and DTOs
 - `prisma/schema.prisma`: Centralized database schema

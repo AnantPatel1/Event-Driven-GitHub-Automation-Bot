@@ -9,14 +9,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
    * GET /auth/github
    * Initiates GitHub OAuth authorization flow
    */
-  fastify.get('/auth/github', async (_request, reply) => {
+  fastify.get('/auth/github', async (request, reply) => {
     // Generate secure random state token to prevent CSRF
     const state = crypto.randomBytes(24).toString('hex');
 
+    const isHttps = request.protocol === 'https' || env.NODE_ENV === 'production';
     reply.setCookie('oauth_state', state, {
       signed: true,
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 600, // 10 minutes
@@ -145,10 +146,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       });
 
       // Issue signed httpOnly session cookie
+      const isHttps = request.protocol === 'https' || env.NODE_ENV === 'production';
       reply.setCookie('session', user.id, {
         signed: true,
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
+        secure: isHttps,
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60, // 7 days

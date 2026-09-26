@@ -137,8 +137,8 @@ export const repositoryRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
         user.githubUsername
       );
 
-      // Step 2: Configure webhook URL and secret
-      const webhookBase = env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      // Step 2: Configure webhook URL and secret (supports public tunnels like ngrok)
+      const webhookBase = env.WEBHOOK_PUBLIC_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const webhookUrl = `${webhookBase}/webhooks/github`;
       const webhookSecret = env.GITHUB_WEBHOOK_SECRET || 'development_webhook_secret_key_32chars';
 
