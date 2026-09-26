@@ -23,7 +23,7 @@ export const integrationsRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       orderBy: { createdAt: 'desc' },
     });
 
-    const items: SlackIntegrationItem[] = integrations.map((item) => ({
+    const items: SlackIntegrationItem[] = (integrations as any[]).map((item: any) => ({
       id: item.id,
       userId: item.userId,
       repositoryId: item.repositoryId,

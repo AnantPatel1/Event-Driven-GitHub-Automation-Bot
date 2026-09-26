@@ -19,13 +19,24 @@ const envSchema = z.object({
   SLACK_WEBHOOK_URL: z.string().default(''),
   SESSION_SECRET: z.string().default('default_session_secret_at_least_32_chars_long_12345'),
   GEMINI_API_KEY: z.string().default(''),
+  ENCRYPTION_KEY: z.string().default(''),
+  APP_URL: z.string().optional(),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+export type Env = z.infer<typeof envSchema>;
 
-if (!parsedEnv.success) {
-  console.error('❌ Invalid environment variables:', parsedEnv.error.format());
-  process.exit(1);
+let parsedEnv: Env;
+try {
+  parsedEnv = envSchema.parse(process.env);
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.error('❌ Invalid environment variables:', error.format());
+  }
+  parsedEnv = envSchema.parse({
+    DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/github_bot?schema=public',
+    ...process.env,
+  });
 }
 
-export const env = parsedEnv.data;
+export const env: Env = parsedEnv;
+

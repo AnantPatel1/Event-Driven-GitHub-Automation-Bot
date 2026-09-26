@@ -12,6 +12,7 @@
     "dev:web": "npm run dev --workspace=@github-bot/web",
     "build:shared": "npm run build --workspace=@github-bot/shared",
     "build:web": "npm run build:shared && npm run build --workspace=@github-bot/web",
+    "build:server": "npm run build:shared && npm run db:generate && npm run build --workspace=@github-bot/server",
     "build": "npm run build:shared && npm run build --workspace=@github-bot/server && npm run build --workspace=@github-bot/web",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
