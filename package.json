@@ -22,12 +22,14 @@
     "docker:down": "docker compose down",
     "test": "tsx scripts/test_auth.ts && tsx scripts/test_repositories.ts && tsx scripts/test_engine.ts && tsx scripts/test_slack.ts"
   },
-  "devDependencies": {
+  "dependencies": {
     "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
     "concurrently": "^9.1.2",
     "dotenv": "^16.4.7",
     "prisma": "^6.4.1",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "tsx": "^4.19.3"
   }
 }
